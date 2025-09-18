@@ -28,17 +28,17 @@ class ChatGPTModule(AIModuleInterface):
 
     def send_json_prompt(self, prompt):
         raw = self.send_raw_prompt(prompt)
-        print(f"[DEBUG] GPT raw response:\n{raw}")
+        # print(f"[DEBUG] GPT raw response:\n{raw}")
         # Extrahiere JSON aus Antwort (triple backticks oder code block)
         match = re.search(r"```json\s*(.*?)```", raw, re.DOTALL)
         if not match:
             match = re.search(r"({.*})", raw, re.DOTALL)  # mit Gruppe
         match_content = match.group(1) if match and match.lastindex == 1 else None
-        print(f"[DEBUG] Regex match: {match_content}")
+        # print(f"[DEBUG] Regex match: {match_content}")
         if match_content:
             try:
                 parsed = json.loads(match_content)
-                print(f"[DEBUG] Parsed JSON: {parsed}")
+                # print(f"[DEBUG] Parsed JSON: {parsed}")
                 return parsed
             except Exception as e:
                 print(f"[DEBUG] JSON parsing error: {e}")
@@ -55,7 +55,7 @@ class ChatGPTModule(AIModuleInterface):
         max_attempts = 3
         for attempt in range(max_attempts):
             raw = self.send_raw_prompt(prompt)
-            print(f"[DEBUG] get_number_of_steps attempt {attempt+1}: {raw}")
+            # print(f"[DEBUG] get_number_of_steps attempt {attempt+1}: {raw}")
             # Nur eine reine Zahl akzeptieren
             match = re.fullmatch(r"\s*(\d+)\s*", raw)
             if match:

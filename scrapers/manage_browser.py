@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from logs import setup_logging
+import requests
 
 logger = setup_logging("manage_browser")
 
@@ -113,12 +114,13 @@ def close_browser(browser):
         except Exception as e:
             logger.error(f"Error closing browser: {e}")
 
-def capture_thumbnail(browser):
+def capture_thumbnail(browser, recipe_name=None):
     """
     Attempts to capture a video thumbnail from the current page.
     
     Args:
         browser (WebDriver): The browser window object.
+        recipe_name (str, optional): Name of the recipe for image search.
     
     Returns:
         str or None: Path to the thumbnail file if successful, otherwise None.
@@ -148,6 +150,37 @@ def capture_thumbnail(browser):
         except Exception as e:
             logger.info(f"Failed to capture thumbnail: {e}")
             return None
-    else: 
-        logger.info("Skipping thumbnail capture in Docker environment")
+    else:
+        # Docker-Umgebung: Fallback-Bild von loremflickr oder Unsplash
+        os.makedirs('thumbnails', exist_ok=True)
+        thumbnail_filename = f"thumbnails/thumbnail_{int(time.time())}.jpg"
+        search_term = recipe_name if recipe_name else "food"
+        try:
+            logger.info(f"[DOCKER] Attempting to fetch image from loremflickr for: {search_term}")
+            url = f"https://loremflickr.com/640/480/{search_term.replace(' ', '%20')}"
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                with open(thumbnail_filename, 'wb') as f:
+                    f.write(response.content)
+                logger.info(f"[DOCKER] Thumbnail saved to {thumbnail_filename} from loremflickr")
+                return thumbnail_filename
+            else:
+                logger.info(f"[DOCKER] Failed to fetch image from loremflickr, status: {response.status_code}")
+        except Exception as e:
+            logger.info(f"[DOCKER] Error fetching image from loremflickr: {e}")
+        # Fallback: Unsplash (ohne API-Key nur ein generisches Bild)
+        try:
+            logger.info(f"[DOCKER] Attempting to fetch fallback image from Unsplash")
+            unsplash_url = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=640&q=80"
+            response = requests.get(unsplash_url, timeout=10)
+            if response.status_code == 200:
+                with open(thumbnail_filename, 'wb') as f:
+                    f.write(response.content)
+                logger.info(f"[DOCKER] Thumbnail saved to {thumbnail_filename} from Unsplash fallback")
+                return thumbnail_filename
+            else:
+                logger.info(f"[DOCKER] Failed to fetch fallback image from Unsplash, status: {response.status_code}")
+        except Exception as e:
+            logger.info(f"[DOCKER] Error fetching fallback image from Unsplash: {e}")
+        logger.info(f"[DOCKER] No thumbnail could be generated.")
         return None

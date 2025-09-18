@@ -109,19 +109,17 @@ def send_recipe(api_type, json_data, thumbnail_filename):
     headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
 
     try:
-        # Debug: Log alle gesendeten Daten
-        api_logger.info(f"[DEBUG] Sending recipe to {api_type} API: {base_url}{create_endpoint}")
-        api_logger.info(f"[DEBUG] Request headers: {headers}")
-        api_logger.info(f"[DEBUG] Request JSON data: {json.dumps(json_data, indent=2)}")
         response = request.post(f'{base_url}{create_endpoint}', 
                               json=json_data, 
                               headers=headers)
         api_logger.info(f"[DEBUG] Response status code: {response.status_code}")
-        api_logger.info(f"[DEBUG] Response content: {response.content}")
         # Extract recipe ID
         recipe_id = extract_id(response)
         api_logger.info(f"{api_type} Recipe ID: {recipe_id}")
         # Upload thumbnail if available
+        api_logger.info(f"Thumbnail File: {thumbnail_filename}")
+        api_logger.info(f"Path exists: {os.path.exists(thumbnail_filename)}")
+        
         if thumbnail_filename and recipe_id and os.path.exists(thumbnail_filename):
             if api_type == "TANDOOR":
                 upload_tandoor_thumbnail(base_url, token, recipe_id, thumbnail_filename, api_logger)
@@ -151,46 +149,50 @@ def send_recipe(api_type, json_data, thumbnail_filename):
         api_logger.error(f"Unexpected error: {e}")
         return {"status": "error", "error": str(e)}
     finally:
-        api_logger.info(json.dumps(json_data, indent=2))
+        api_logger.info('Done.')
 
 
 def upload_tandoor_thumbnail(base_url, token, recipe_id, thumbnail_filename, logger):
     """
     Upload a thumbnail image to an existing Tandoor recipe
     """
+    logger.info(f"[DEBUG] upload_tandoor_thumbnail called with base_url={base_url}, token={token}, recipe_id={recipe_id}, thumbnail_filename={thumbnail_filename}")
     headers = {'Authorization': f'Bearer {token}'}
-    
     try:
+        logger.info(f"[DEBUG] Opening image file: {thumbnail_filename}")
         # Open and optimize the image
         with Image.open(thumbnail_filename) as img:
+            logger.info(f"[DEBUG] Image opened. Mode: {img.mode}, Size: {img.size}")
             # Convert to RGB if needed (in case of PNG with alpha channel)
             if img.mode in ('RGBA', 'LA'):
+                logger.info("[DEBUG] Converting image to RGB due to alpha channel.")
                 background = Image.new('RGB', img.size, (255, 255, 255))
                 background.paste(img, mask=img.split()[3])  # 3 is the alpha channel
                 img = background
-            
             # Save to a BytesIO object
             img_byte_arr = BytesIO()
             img.save(img_byte_arr, format='JPEG', quality=85)
             img_byte_arr.seek(0)
-            
+            logger.info(f"[DEBUG] Image converted and saved to BytesIO.")
             # Create the multipart form data
             files = {
                 'image': (os.path.basename(thumbnail_filename), img_byte_arr, 'image/jpeg')
             }
-            
+            logger.info(f"[DEBUG] Sending PUT request to {base_url}/api/recipe/{recipe_id}/image/")
             # Send the request to the specific image endpoint
             response = request.put(
                 f'{base_url}/api/recipe/{recipe_id}/image/',
                 files=files,
                 headers=headers
             )
+            logger.info(f"[DEBUG] PUT response status: {response.status_code}")
+            logger.info(f"[DEBUG] PUT response text: {response.text}")
             response.raise_for_status()
             logger.info(f"Successfully uploaded thumbnail for Tandoor recipe {recipe_id}")
-            
     except Exception as e:
-        logger.error(f"Failed to upload thumbnail: {e}")
+        logger.error(f"[DEBUG] Failed to upload thumbnail: {e}")
         logger.error(f"Thumbnail path: {thumbnail_filename}")
+        logger.error(f"Recipe ID: {recipe_id}")
 
 
 def upload_mealie_thumbnail(base_url, token, recipe_slug, thumbnail_filename, logger):
