@@ -14,5 +14,8 @@ services:
       - LANGUAGE_CODE=de
       # your db secret (random string)
       - DB_SECRET=
+      # the AI provider to use (duckai, openai) (defaults to duckai)
+      # - AI_MODULE=openai
+      # - OPENAI_API_KEY=
     volumes:
       - ./app.db:/app/app.db

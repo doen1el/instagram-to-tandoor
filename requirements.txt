@@ -1,3 +1,4 @@
+openai>=1.0.0
 aiodns==3.2.0
 aiohappyeyeballs==2.4.4
 aiohttp==3.11.11
