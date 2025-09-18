@@ -5,7 +5,7 @@ import openai
 from .ai_module_interface import AIModuleInterface
 
 class ChatGPTModule(AIModuleInterface):
-    def __init__(self, api_key=None, model="gpt-4"):
+    def __init__(self, api_key=None, model="gpt-5"):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model
         openai.api_key = self.api_key
