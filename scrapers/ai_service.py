@@ -1,8 +1,8 @@
 
 import os
 from logs import setup_logging
-from ai_modules.duck_ai import DuckAIModule
-from ai_modules.chat_gpt import ChatGPTModule
+from scrapers.ai_modules.duck_ai import DuckAIModule
+from scrapers.ai_modules.chat_gpt import ChatGPTModule
 
 logger = setup_logging("ai_service")
 
