@@ -4,17 +4,14 @@ from logs import setup_logging
 from ai_modules.ai_module_interface import AIModuleInterface
 from ai_modules.duck_ai import DuckAIModule
 from ai_modules.chat_gpt import ChatGPTModule
-# Hier können weitere AI-Module importiert werden (z.B. ChatGPT)
 
 logger = setup_logging("ai_service")
 
 def get_ai_module():
     module_name = os.getenv("AI_MODULE", "duck_ai")
     if module_name == "duck_ai":
-        # DuckAI benötigt einen Browser, z.B. Selenium WebDriver
-        # Der Browser muss extern übergeben werden!
         from selenium import webdriver
-        browser = webdriver.Chrome() # oder andere Instanz, ggf. anpassen
+        browser = webdriver.Chrome()
         return DuckAIModule(browser)
     elif module_name == "openai":
         return ChatGPTModule()

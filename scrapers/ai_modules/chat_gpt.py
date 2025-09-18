@@ -47,7 +47,6 @@ class ChatGPTModule(AIModuleInterface):
         return int(numbers[0]) if numbers else None
 
     def process_recipe_part(self, part, mode="", step_number=None):
-        # Prompt-Logik wie bei DuckAI, aber als API-Call
         if mode == "step" or step_number is not None:
             prompt = f"Write your Response in the language {os.getenv('LANGUAGE_CODE', 'en')}. Please fill out this JSON document {part}. Only complete the specified sections. Only complete step {step_number} of the recipe. If the step has more than 3 ingredients, only complete the first 3 and finish the JSON object. The name of the step should be the step number e.g. 'name': '{step_number}.'. Only include the current instruction description in the instruction field. The amount value of the ingredient can only be a whole number or a decimal NOT A FRACTION (convert it to a decimal). If an ingredient has already been mentioned in a previous step, do not include it again as an ingredient in this step. Respond with a JSON code block enclosed in triple backticks (```json)."
         elif mode == "info":
