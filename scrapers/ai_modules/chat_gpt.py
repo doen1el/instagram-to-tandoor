@@ -20,7 +20,7 @@ class ChatGPTModule(AIModuleInterface):
         if self.context:
             messages.append({"role": "system", "content": f"Recipe context: {self.context}"})
         messages.append({"role": "user", "content": prompt})
-        response = openai.ChatCompletion.create(
+        response = openai.resources.chat.completions.create(
             model=self.model,
             messages=messages
         )
