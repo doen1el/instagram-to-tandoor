@@ -40,6 +40,6 @@ def get_number_of_steps(caption=None):
     initialize_ai_module()
     return ai_module.get_number_of_steps(caption)
 
-def process_recipe_part(part, mode="", step_number=None):
+def process_recipe_part(part, mode="", step_number=None, context=None):
     initialize_ai_module()
-    return ai_module.process_recipe_part(part, mode, step_number)
+    return ai_module.process_recipe_part(part, mode, step_number, context)

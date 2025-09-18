@@ -1,3 +1,38 @@
+def validate_tandoor_payload(payload, source_url=None):
+    """
+    Validiert und ergänzt alle Pflichtfelder für Tandoor-API.
+    Args:
+        payload (dict): Das zu prüfende Rezept-JSON
+        source_url (str, optional): Die Quell-URL des Rezepts
+    Returns:
+        dict: Validiertes und ergänztes Rezept-JSON
+    """
+    tandoor_required = {
+        "name": "Unbenanntes Rezept",
+        "description": "",
+        "steps": [],
+        "keywords": [],
+        "image": None,
+        "internal": True,
+        "show_ingredient_overview": False,
+        "servings": 1,
+        "servings_text": "",
+        "working_time": 0,
+        "waiting_time": 0,
+        "source_url": source_url or payload.get("source_url", ""),
+        "private": False,
+        "shared": []
+    }
+    for key, value in tandoor_required.items():
+        if key not in payload or payload[key] is None:
+            payload[key] = value
+    if not isinstance(payload["steps"], list):
+        payload["steps"] = []
+    if not isinstance(payload["keywords"], list):
+        payload["keywords"] = []
+    if not payload["name"]:
+        payload["name"] = "Unbenanntes Rezept"
+    return payload
 import json
 import os
 from io import BytesIO
@@ -32,36 +67,67 @@ def send_recipe(api_type, json_data, thumbnail_filename):
     if api_type == "TANDOOR":
         create_endpoint = "/api/recipe/"
         extract_id = lambda response: response.json().get('id')
+        # --- Tandoor: Payload anpassen ---
+        # Pflichtfelder laut OpenAPI Spec
+        tandoor_defaults = {
+            "name": "Unbenanntes Rezept",
+            "description": "",
+            "steps": [],
+            "keywords": [],
+            "image": None,
+            "internal": True,
+            "show_ingredient_overview": False,
+            "servings": 1,
+            "servings_text": "",
+            "working_time": 0,
+            "waiting_time": 0,
+            "source_url": "",
+            "private": False,
+            "shared": []
+        }
+        # Füge fehlende Felder hinzu
+        for key, value in tandoor_defaults.items():
+            if key not in json_data:
+                json_data[key] = value
+        # steps muss ein Array von Objekten sein
+        if not isinstance(json_data["steps"], list):
+            json_data["steps"] = []
+        # keywords muss ein Array sein
+        if not isinstance(json_data["keywords"], list):
+            json_data["keywords"] = []
+        # name darf nicht leer sein
+        if not json_data["name"]:
+            json_data["name"] = "Unbenanntes Rezept"
     elif api_type == "MEALIE":
         create_endpoint = "/api/recipes/create/html-or-json"
         extract_id = lambda response: response.content.decode('utf-8').strip('"')
     else:
         api_logger.error(f"Unknown API type: {api_type}")
         return {"status": "error", "error": f"Unknown API type: {api_type}"}
-    
+
     # Common headers for both APIs
     headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-    
+
     try:
-        # Send recipe data to API
-        api_logger.info(f"Sending recipe to {api_type} API: {base_url}")
+        # Debug: Log alle gesendeten Daten
+        api_logger.info(f"[DEBUG] Sending recipe to {api_type} API: {base_url}{create_endpoint}")
+        api_logger.info(f"[DEBUG] Request headers: {headers}")
+        api_logger.info(f"[DEBUG] Request JSON data: {json.dumps(json_data, indent=2)}")
         response = request.post(f'{base_url}{create_endpoint}', 
                               json=json_data, 
                               headers=headers)
-        
+        api_logger.info(f"[DEBUG] Response status code: {response.status_code}")
+        api_logger.info(f"[DEBUG] Response content: {response.content}")
         # Extract recipe ID
         recipe_id = extract_id(response)
         api_logger.info(f"{api_type} Recipe ID: {recipe_id}")
-        
         # Upload thumbnail if available
         if thumbnail_filename and recipe_id and os.path.exists(thumbnail_filename):
             if api_type == "TANDOOR":
                 upload_tandoor_thumbnail(base_url, token, recipe_id, thumbnail_filename, api_logger)
             else:
                 upload_mealie_thumbnail(base_url, token, recipe_id, thumbnail_filename, api_logger)
-            
         response.raise_for_status()
-        
         return {
             "status": "success",
             "recipe_id": recipe_id,

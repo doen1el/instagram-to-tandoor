@@ -20,45 +20,122 @@ class ChatGPTModule(AIModuleInterface):
         if self.context:
             messages.append({"role": "system", "content": f"Recipe context: {self.context}"})
         messages.append({"role": "user", "content": prompt})
-        response = openai.resources.chat.completions.create(
+        response = openai.chat.completions.create(
             model=self.model,
             messages=messages
         )
-        return response.choices[0].message["content"]
+        return response.choices[0].message.content
 
     def send_json_prompt(self, prompt):
         raw = self.send_raw_prompt(prompt)
+        print(f"[DEBUG] GPT raw response:\n{raw}")
         # Extrahiere JSON aus Antwort (triple backticks oder code block)
-        match = re.search(r"```json\\s*(.*?)```", raw, re.DOTALL)
+        match = re.search(r"```json\s*(.*?)```", raw, re.DOTALL)
         if not match:
-            match = re.search(r"{.*}", raw, re.DOTALL)
-        if match:
+            match = re.search(r"({.*})", raw, re.DOTALL)  # mit Gruppe
+        match_content = match.group(1) if match and match.lastindex == 1 else None
+        print(f"[DEBUG] Regex match: {match_content}")
+        if match_content:
             try:
-                return json.loads(match.group(1))
-            except Exception:
+                parsed = json.loads(match_content)
+                print(f"[DEBUG] Parsed JSON: {parsed}")
+                return parsed
+            except Exception as e:
+                print(f"[DEBUG] JSON parsing error: {e}")
                 return None
+        print("[DEBUG] No valid JSON found in response.")
         return None
 
     def get_number_of_steps(self, caption=None):
         self.initialize_chat(caption)
-        prompt = "How many steps are in this recipe? Please respond with only a number."
-        raw = self.send_raw_prompt(prompt)
-        numbers = re.findall(r"\\d+", raw)
-        return int(numbers[0]) if numbers else None
+        prompt = (
+            "How many steps are in this recipe? Respond only with a single integer. "
+            "Do not include any explanation, text, units, or formatting. Only reply with the number."
+        )
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            raw = self.send_raw_prompt(prompt)
+            print(f"[DEBUG] get_number_of_steps attempt {attempt+1}: {raw}")
+            # Nur eine reine Zahl akzeptieren
+            match = re.fullmatch(r"\s*(\d+)\s*", raw)
+            if match:
+                return int(match.group(1))
+            # Fallback: Zahl irgendwo im Text suchen
+            numbers = re.findall(r"\d+", raw)
+            if numbers:
+                return int(numbers[0])
+        print("[DEBUG] Failed to extract number of steps after 3 attempts.")
+        return None
 
-    def process_recipe_part(self, part, mode="", step_number=None):
+    def process_recipe_part(self, part, mode="", step_number=None, context=None):
+        # Kontext einfügen
+        context_str = ""
+        if context:
+            if isinstance(context, dict):
+                context_str = f"Recipe context (JSON): {json.dumps(context, ensure_ascii=False)}\n"
+            else:
+                context_str = f"Recipe context: {context}\n"
         if mode == "step" or step_number is not None:
-            prompt = f"Write your Response in the language {os.getenv('LANGUAGE_CODE', 'en')}. Please fill out this JSON document {part}. Only complete the specified sections. Only complete step {step_number} of the recipe. If the step has more than 3 ingredients, only complete the first 3 and finish the JSON object. The name of the step should be the step number e.g. 'name': '{step_number}.'. Only include the current instruction description in the instruction field. The amount value of the ingredient can only be a whole number or a decimal NOT A FRACTION (convert it to a decimal). If an ingredient has already been mentioned in a previous step, do not include it again as an ingredient in this step. Respond with a JSON code block enclosed in triple backticks (```json)."
+            prompt = (
+                f"{context_str}"
+                f"Please respond ONLY with a valid JSON code block (```json ... ```).\n"
+                f"Fill out the following fields for step {step_number} of the recipe: 'name', 'instruction', 'ingredients', 'time', 'order', 'show_as_header', 'show_ingredients_table'.\n"
+                f"- 'name' should be the step number, e.g. 'name': '{step_number}.'\n"
+                f"- 'instruction' should be a clear, short description of the step.\n"
+                f"- 'ingredients' should be a list of ingredient objects (max 3 per step).\n"
+                f"- 'amount' must be a whole number or decimal, NOT a fraction.\n"
+                f"- Do NOT repeat ingredients from previous steps.\n"
+                f"- Example format: ```json {{'name': '1.', 'instruction': 'Chop onions.', 'ingredients': [{{'food': {{'name': 'onion'}}, 'amount': '1', ...}}], 'time': 5, 'order': 1, 'show_as_header': false, 'show_ingredients_table': true}}```\n"
+                f"Language: {os.getenv('LANGUAGE_CODE', 'en')}\n"
+                f"JSON template: {part}"
+            )
         elif mode == "info":
-            prompt = f"Write your Response in the language {os.getenv('LANGUAGE_CODE', 'en')}. Please fill out this JSON document {part} Only fill out author, description, recipeYield, prepTime and cooktime. The cooktime and pretime should have the format e.g. PT1H for one hour or PT15M for 15 Minutes."
+            prompt = (
+                f"{context_str}"
+                f"Please respond ONLY with a valid JSON code block (```json ... ```).\n"
+                f"Fill out the fields: 'author', 'description', 'recipeYield', 'prepTime', 'cooktime'.\n"
+                f"- 'prepTime' and 'cooktime' format: PT1H for one hour, PT15M for 15 minutes.\n"
+                f"Language: {os.getenv('LANGUAGE_CODE', 'en')}\n"
+                f"JSON template: {part}"
+            )
         elif mode == "ingredients":
-            prompt = f"Write your Response in the language {os.getenv('LANGUAGE_CODE', 'en')}. Please fill out this JSON document {part} Append the ingredients to the 'recipeIngredient' list. One ingredient per line."
+            prompt = (
+                f"{context_str}"
+                f"Please respond ONLY with a valid JSON code block (```json ... ```).\n"
+                f"Append the ingredients to the 'recipeIngredient' list. One ingredient per line.\n"
+                f"Language: {os.getenv('LANGUAGE_CODE', 'en')}\n"
+                f"JSON template: {part}"
+            )
         elif mode == "name":
-            prompt = f"Write your Response in the language {os.getenv('LANGUAGE_CODE', 'en')}. Please fill out this JSON document {part} Keep the name of the recipe short."
+            prompt = (
+                f"{context_str}"
+                f"Please respond ONLY with a valid JSON code block (```json ... ```).\n"
+                f"Fill out the field 'name' with a short, clear recipe name.\n"
+                f"Language: {os.getenv('LANGUAGE_CODE', 'en')}\n"
+                f"JSON template: {part}"
+            )
         elif mode == "nutrition":
-            prompt = f"Write your Response in the language {os.getenv('LANGUAGE_CODE', 'en')}. Please fill out this JSON document {part} Only fill out calories and fatContent with a string."
+            prompt = (
+                f"{context_str}"
+                f"Please respond ONLY with a valid JSON code block (```json ... ```).\n"
+                f"Fill out the fields: 'calories' and 'fatContent' as strings.\n"
+                f"Language: {os.getenv('LANGUAGE_CODE', 'en')}\n"
+                f"JSON template: {part}"
+            )
         elif mode == "instructions":
-            prompt = f"Write your Response in the language {os.getenv('LANGUAGE_CODE', 'en')}. Please fill out this JSON document {part} Write the instruction as one long string. No string separation, just one long text! Don't add ingredients here. JSON FORMAT IN CODE WINDOW!"
+            prompt = (
+                f"{context_str}"
+                f"Please respond ONLY with a valid JSON code block (```json ... ```).\n"
+                f"Write the instruction as one long string. No string separation, just one long text! Don't add ingredients here.\n"
+                f"Language: {os.getenv('LANGUAGE_CODE', 'en')}\n"
+                f"JSON template: {part}"
+            )
         else:
-            prompt = f"Write your Response in the language {os.getenv('LANGUAGE_CODE', 'en')}. Please fill out this JSON document {part}. Only complete the specified sections of the document. Ensure the response is formatted as a JSON code block enclosed in triple backticks (```json)."
+            prompt = (
+                f"{context_str}"
+                f"Please respond ONLY with a valid JSON code block (```json ... ```).\n"
+                f"Fill out the specified sections of the document.\n"
+                f"Language: {os.getenv('LANGUAGE_CODE', 'en')}\n"
+                f"JSON template: {part}"
+            )
         return self.send_json_prompt(prompt)

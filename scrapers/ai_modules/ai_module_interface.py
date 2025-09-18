@@ -18,5 +18,5 @@ class AIModuleInterface(ABC):
 		pass
 
 	@abstractmethod
-	def process_recipe_part(self, part, mode="", step_number=None):
+	def process_recipe_part(self, part, mode="", step_number=None, context=None):
 		pass

@@ -103,30 +103,32 @@ def scrape_recipe_for_tandoor(url, platform):
 
         # Get recipe name and description
         logger.info("Getting recipe name and description")
-        name_res = process_recipe_part(json_parts[0])
+        name_res = process_recipe_part(json_parts[0], context=caption)
         if name_res:
             full_json.update(name_res)
             logger.info(f"Recipe name: {name_res.get('name', 'Unknown')}")
+            context_for_steps = name_res
         else:
             logger.warning("Failed to get recipe name and description")
+            context_for_steps = None
 
         # Get recipe steps and ingredients
         logger.info("Getting recipe steps and ingredients")
         steps = {"steps": []}
         for i in range(1, number_of_steps + 1):
             logger.info(f"Processing step {i}/{number_of_steps}")
-            instruction_res = process_recipe_part(json_parts[1], "step", i)
+            instruction_res = process_recipe_part(json_parts[1], "step", i, context=context_for_steps)
             if instruction_res:
                 steps["steps"].append(instruction_res)
                 logger.info(f"Step {i} processed successfully")
             else:
                 logger.warning(f"Failed to process step {i}")
-
         full_json.update(steps)
+        context_for_servings = {**full_json}  # Kontext für Servings/Nutrition
 
         # Get serving information
         logger.info("Getting serving information")
-        servings_res = process_recipe_part(json_parts[2])
+        servings_res = process_recipe_part(json_parts[2], context=context_for_servings)
         if servings_res:
             full_json.update(servings_res)
             logger.info(f"Servings: {servings_res.get('servings', 'Unknown')}")
@@ -135,7 +137,7 @@ def scrape_recipe_for_tandoor(url, platform):
 
         # Get nutrition and timing information
         logger.info("Getting nutrition and timing information")
-        nutrition_res = process_recipe_part(json_parts[3])
+        nutrition_res = process_recipe_part(json_parts[3], context=context_for_servings)
         if nutrition_res:
             full_json.update(nutrition_res)
             logger.info("Nutrition and timing information processed successfully")
@@ -149,6 +151,10 @@ def scrape_recipe_for_tandoor(url, platform):
         for step in full_json.get("steps", []):
             for ingredient in step.get("ingredients", []):
                 ingredient["is_header"] = False
+
+        # Moderne Validierung: Nutze Hilfsfunktion aus api_service
+        from scrapers.api_service import validate_tandoor_payload
+        full_json = validate_tandoor_payload(full_json, source_url=url)
 
         # Save the final JSON
         logger.info("Saving final JSON")
