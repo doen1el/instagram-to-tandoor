@@ -1,7 +1,6 @@
 
 import os
 from logs import setup_logging
-from ai_modules.ai_module_interface import AIModuleInterface
 from ai_modules.duck_ai import DuckAIModule
 from ai_modules.chat_gpt import ChatGPTModule
 
