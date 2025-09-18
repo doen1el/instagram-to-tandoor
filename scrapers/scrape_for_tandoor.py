@@ -3,7 +3,6 @@ import json
 from logs import setup_logging
 from scrapers.ai_service import get_number_of_steps, initialize_chat, process_recipe_part
 from scrapers.api_service import send_recipe
-from scrapers.manage_browser import close_browser, open_browser
 from scrapers.social_scraper import get_caption_from_post
 
 logger = setup_logging("scrape_for_tandoor")
@@ -33,26 +32,20 @@ def scrape_recipe_for_tandoor(url, platform):
     caption, thumbnail_filename = result
     logger.info(f"Caption extracted successfully ({len(caption)} chars)")
     
-    # Open a single browser instance that will be used for all Duck.ai interactions
-    browser = open_browser()
-    if not browser:
-        logger.error("Failed to open browser")
-        raise Exception("Failed to open browser")
-    
     try:
-        # Initialize chat with the recipe caption to establish context
-        if not initialize_chat(browser, caption):
+        # Initialisiere AI-Kontext
+        if not initialize_chat(caption):
             logger.error("Failed to initialize chat with recipe context")
             raise Exception("Failed to initialize chat with recipe context")
-        
+
         # Get the number of steps in the recipe
-        number_of_steps = get_number_of_steps(browser, caption)
+        number_of_steps = get_number_of_steps(caption)
         if not number_of_steps:
             logger.error("Failed to determine number of steps in recipe")
             raise Exception("Failed to determine number of steps in recipe")
-        
+
         logger.info(f"Recipe has {number_of_steps} steps")
-        
+
         # Define JSON templates for different parts of the recipe
         json_parts = [
             {
@@ -104,74 +97,70 @@ def scrape_recipe_for_tandoor(url, platform):
                 "show_ingredient_overview": True,
             } 
         ]
-        
+
         # Build the recipe JSON structure
         full_json = {}
-        
+
         # Get recipe name and description
         logger.info("Getting recipe name and description")
-        name_res = process_recipe_part(browser, json_parts[0])
+        name_res = process_recipe_part(json_parts[0])
         if name_res:
             full_json.update(name_res)
             logger.info(f"Recipe name: {name_res.get('name', 'Unknown')}")
         else:
             logger.warning("Failed to get recipe name and description")
-        
+
         # Get recipe steps and ingredients
         logger.info("Getting recipe steps and ingredients")
         steps = {"steps": []}
         for i in range(1, number_of_steps + 1):
             logger.info(f"Processing step {i}/{number_of_steps}")
-            instruction_res = process_recipe_part(browser, json_parts[1], True, i)
+            instruction_res = process_recipe_part(json_parts[1], "step", i)
             if instruction_res:
                 steps["steps"].append(instruction_res)
                 logger.info(f"Step {i} processed successfully")
             else:
                 logger.warning(f"Failed to process step {i}")
-        
+
         full_json.update(steps)
-        
+
         # Get serving information
         logger.info("Getting serving information")
-        servings_res = process_recipe_part(browser, json_parts[2])
+        servings_res = process_recipe_part(json_parts[2])
         if servings_res:
             full_json.update(servings_res)
             logger.info(f"Servings: {servings_res.get('servings', 'Unknown')}")
         else:
             logger.warning("Failed to get serving information")
-        
+
         # Get nutrition and timing information
         logger.info("Getting nutrition and timing information")
-        nutrition_res = process_recipe_part(browser, json_parts[3])
+        nutrition_res = process_recipe_part(json_parts[3])
         if nutrition_res:
             full_json.update(nutrition_res)
             logger.info("Nutrition and timing information processed successfully")
         else:
             logger.warning("Failed to get nutrition and timing information")
-        
+
         # Add source URL
         full_json["source_url"] = url
-        
+
         # Fix ingredient header flags
         for step in full_json.get("steps", []):
             for ingredient in step.get("ingredients", []):
                 ingredient["is_header"] = False
-        
+
         # Save the final JSON
         logger.info("Saving final JSON")
         with open('./scrapers/final_json.json', 'w') as outfile:
             json.dump(full_json, outfile, indent=2)
-        
+
         # Send to Tandoor
         logger.info("Sending to Tandoor API")
         tandoor_result = send_recipe("TANDOOR", full_json, thumbnail_filename)
 
         return tandoor_result
-        
+
     except Exception as e:
         logger.error(f"Error processing recipe: {e}", exc_info=True)
         raise
-    
-    finally:
-        # Always close the browser
-        close_browser(browser)
