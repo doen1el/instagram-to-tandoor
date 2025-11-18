@@ -3,8 +3,7 @@ import traceback
 
 from logs import setup_logging
 from models import db, Job
-from scrapers.scrape_for_mealie import scrape_recipe_for_mealie
-from scrapers.scrape_for_tandoor import scrape_recipe_for_tandoor
+from scrapers.scraper_service import ScraperService
 
 logger = setup_logging("job_processor")
 
@@ -66,11 +65,11 @@ def process_scraping_job(job_id):
             if job.target == 'tandoor':
                 update_job_status(job_id, 'processing', 40, 'Processing for Tandoor...')
                 logger.info(f"Processing for Tandoor: {job.url}")
-                result = scrape_recipe_for_tandoor(job.url, job.platform)
+                result = ScraperService.scrape_recipe(job.url, job.platform)
             elif job.target == 'mealie':
                 update_job_status(job_id, 'processing', 40, 'Processing for Mealie...')
                 logger.info(f"Processing for Mealie: {job.url}")
-                result = scrape_recipe_for_mealie(job.url, job.platform)
+                result = ScraperService.scrape_recipe(job.url, job.platform)
                 
             # Check if result indicates an error
             if isinstance(result, dict) and result.get('status') == 'error':

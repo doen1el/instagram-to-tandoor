@@ -1,8 +1,7 @@
 import argparse
 import re
 from dotenv import load_dotenv
-from scrapers.scrape_for_mealie import scrape_recipe_for_mealie
-from scrapers.scrape_for_tandoor import scrape_recipe_for_tandoor
+from scrapers.scraper_service import ScraperService
 
 load_dotenv()
 
@@ -45,12 +44,19 @@ def main():
     if not is_valid_url(args.url, args.platform):
         raise ValueError("Invalid URL. Please provide a valid post URL.")
     
-    if args.mode == 'mealie' or args.mode == 'm':
-        scrape_recipe_for_mealie(args.url, args.platform)
-    elif args.mode == 'tandoor' or args.mode == 't':
-        scrape_recipe_for_tandoor(args.url, args.platform)
-    else:
+    # Setze Provider-ENV entsprechend CLI-Mode
+    import os
+    mode_map = {
+        'mealie': 'mealie',
+        'm': 'mealie',
+        'tandoor': 'tandoor',
+        't': 'tandoor'
+    }
+    provider = mode_map.get(args.mode.lower())
+    if not provider:
         raise ValueError("Invalid mode. Please specify either 'mealie'/'m' or 'tandoor'/'t'")
+    os.environ['RECIPE_PROVIDER'] = provider
+    ScraperService.scrape_recipe(args.url, args.platform)
 
 if __name__ == '__main__':
     main()
