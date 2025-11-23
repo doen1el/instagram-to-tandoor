@@ -1,3 +1,7 @@
+## Archived!
+
+Since the developer of [Kitshn](https://github.com/aimok04/kitshn) has implemented a direct way to import social media posts to tandoor, I will no longer maintain this repo!
+
 <p align="center">
     <img src="./images/icon-512.png" alt="App Icon" width="100" />
 </p>
